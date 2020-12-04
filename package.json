@@ -34,6 +34,9 @@
     "request-promise-native": "^1.0.5",
     "vuex": "^3.0.0"
   },
+  "resolutions": {
+    "client-oauth2/**/popsicle-transport-http": "^1.0.9"
+  },
   "babel": {
     "presets": [
       [
