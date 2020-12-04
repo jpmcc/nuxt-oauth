@@ -8,6 +8,11 @@ let context
 
 beforeEach(() => {
   process.client = true
+  global.window = {
+    location: {
+      assign: jest.fn()
+    }
+  }
   context = {
     store: {
       registerModule: jest.fn(),
@@ -18,7 +23,8 @@ beforeEach(() => {
     redirect: jest.fn(),
     route: {
       matched: [],
-      path: '/path'
+      path: '/path',
+      fullPath: '/path?with=query'
     }
   }
 })
@@ -31,10 +37,10 @@ describe('Plugin', () => {
     expect(context.store.registerModule).toHaveBeenCalled()
   })
 
-  it('does not add the store module on client side', async () => {
+  it('adds the store module on client side', async () => {
     await (Plugin(context, () => {}))
 
-    expect(context.store.registerModule).not.toHaveBeenCalled()
+    expect(context.store.registerModule).toHaveBeenCalled()
   })
 })
 
@@ -48,7 +54,7 @@ describe('Middleware', () => {
     it('redirects', async () => {
       await (Middleware.auth(context))
 
-      expect(context.redirect).not.toHaveBeenCalled()
+      expect(global.window.location.assign).not.toHaveBeenCalled()
     })
   })
 
@@ -61,7 +67,7 @@ describe('Middleware', () => {
     it('redirects', async () => {
       await (Middleware.auth(context))
 
-      expect(context.redirect).toHaveBeenCalled()
+      expect(global.window.location.assign).toHaveBeenCalled()
     })
 
     describe('with an access token', () => {
@@ -72,7 +78,7 @@ describe('Middleware', () => {
       it('does nothing', async () => {
         await (Middleware.auth(context))
 
-        expect(context.redirect).not.toHaveBeenCalled()
+        expect(global.window.location.assign).not.toHaveBeenCalled()
       })
     })
   })
@@ -90,7 +96,7 @@ describe('Middleware', () => {
       it('redirects', async () => {
         await (Middleware.auth(context))
 
-        expect(context.redirect).toHaveBeenCalled()
+        expect(global.window.location.assign).toHaveBeenCalled()
       })
 
       it('calls authenticated', async () => {
@@ -110,7 +116,7 @@ describe('Middleware', () => {
         it('does nothing', async () => {
           await (Middleware.auth(context))
 
-          expect(context.redirect).not.toHaveBeenCalled()
+          expect(global.window.location.assign).not.toHaveBeenCalled()
         })
       })
     })
@@ -130,7 +136,7 @@ describe('Middleware', () => {
         expect(unAuthenticatedMock).toHaveBeenCalledWith({
           options: { authenticated: unAuthenticatedMock }
         })
-        expect(context.redirect).not.toHaveBeenCalled()
+        expect(global.window.location.assign).not.toHaveBeenCalled()
       })
     })
   })
@@ -146,41 +152,37 @@ describe('Helpers', () => {
   })
 
   it('injects login and logout', () => {
-    actions.forEach(a =>
-      expect(inject).toHaveBeenCalledWith(a, expect.any(Function))
-    )
+    actions.forEach(a => expect(inject).toHaveBeenCalledWith(a, expect.any(Function)))
   })
 
-  actions.forEach(actionName =>
-    describe(actionName, () => {
-      let action
+  actions.forEach(actionName => describe(actionName, () => {
+    let action
 
-      beforeEach(() => {
-        action = inject.mock.calls.find(([name]) => name === actionName)[1]
-      })
-
-      it('redirects correctly', () => {
-        action()
-
-        const expected = `/auth/${actionName}?redirect-url=${context.route.fullPath}`
-        expect(context.redirect).toHaveBeenCalledWith(expected)
-      })
-
-      it('redirects correctly with custom redirect url', () => {
-        const redirectUrl = '/custom'
-        action(redirectUrl)
-
-        const expected = `/auth/${actionName}?redirect-url=${encodeURIComponent(redirectUrl)}`
-        expect(context.redirect).toHaveBeenCalledWith(expected)
-      })
-
-      it('retains query parameters during redirect', () => {
-        const redirectUrl = '/custom?foo=bar'
-        action(redirectUrl)
-
-        const expected = `/auth/${actionName}?redirect-url=${encodeURIComponent(redirectUrl)}`
-        expect(context.redirect).toHaveBeenCalledWith(expected)
-      })
+    beforeEach(() => {
+      action = inject.mock.calls.find(([name]) => name === actionName)[1]
     })
-  )
+
+    it('redirects correctly', () => {
+      action()
+
+      const expected = `/auth/${actionName}?redirect-url=${encodeURIComponent(context.route.fullPath)}`
+      expect(global.window.location.assign).toHaveBeenCalledWith(expected)
+    })
+
+    it('redirects correctly with custom redirect url', () => {
+      const redirectUrl = '/custom'
+      action(redirectUrl)
+
+      const expected = `/auth/${actionName}?redirect-url=${encodeURIComponent(redirectUrl)}`
+      expect(global.window.location.assign).toHaveBeenCalledWith(expected)
+    })
+
+    it('retains query parameters during redirect', () => {
+      const redirectUrl = '/custom?foo=bar'
+      action(redirectUrl)
+
+      const expected = `/auth/${actionName}?redirect-url=${encodeURIComponent(redirectUrl)}`
+      expect(global.window.location.assign).toHaveBeenCalledWith(expected)
+    })
+  }))
 })
